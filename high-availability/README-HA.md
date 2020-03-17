@@ -10,7 +10,7 @@ Nginx on the other hand, *may be fast*, but I do not like it because:
 * It's configuration file(s) suffer the same problem as Apache - i.e. complexity
 * Above is bad enough, so I don't have to list more points
 
-To build a proof of concept setup using one reverse proxy instance of HAProxy and one of more instances of backend servers, is very easy on docker-compose. i.e. You really don't need three VMs to build a POC.
+To build a POC (proof of concept) setup using one reverse proxy instance of HAProxy and one of more instances of backend servers, is very easy on docker-compose. i.e. You really don't need three VMs to build a POC.
 
 However, if you want to build a POC of HAProxy running in HA mode itself, serving a farm of servers as backend, then the most logical choice is to use VMs. 
 
@@ -36,8 +36,12 @@ f95d42d96150        host                host                local
 [kamran@kworkhorse https]$ 
 ```
 
+
+Started Keepalived in a container, without any special privileges:
 ```
-# keepalived --use-file /etc/keepalived/keepalived.conf  --log-console --dont-fork 
+[kamran@kworkhorse tmp]$ docker exec -it high-availability_haproxy-master_1 /bin/sh
+
+ # keepalived --use-file /etc/keepalived/keepalived.conf  --log-console --dont-fork 
 Tue Mar 17 20:44:41 2020: Starting Keepalived v2.0.19 (11/24,2019), git commit v20191114-652-g038556d644
 Tue Mar 17 20:44:41 2020: Running on Linux 5.5.7-200.fc31.x86_64 #1 SMP Fri Feb 28 17:18:37 UTC 2020 (built for Linux 4.19.36)
 Tue Mar 17 20:44:41 2020: Command line: 'keepalived' '--use-file' '/etc/keepalived/keepalived.conf' '--log-console'
@@ -62,21 +66,25 @@ Tue Mar 17 20:44:57 2020: Stopped
 Tue Mar 17 20:44:57 2020: Stopped Keepalived v2.0.19 (11/24,2019), git commit v20191114-652-g038556d644
 / # pkill keepalived
 ```
+Above does not work, because the container needs some special capabilities so keepalived can do it's thing.
+
 
 ```
-/ # [kamran@kworkhorse kubernetes]$ docker exec -it high-availability_web1_1 /bin/sh
+[kamran@kworkhorse kubernetes]$ docker exec -it high-availability_web1_1 /bin/sh
 / # touch /usr/share/nginx/html/backend.member
 ```
 
-/ # [kamran@kworkhorse kubernetes]$ docker exec -it high-availability_web2_1 /bin/sh
+[kamran@kworkhorse kubernetes]$ docker exec -it high-availability_web2_1 /bin/sh
 / # touch /usr/share/nginx/html/backend.member
-/ #
 ``` 
 
 
+Added capabilities to the compose file, and restarted Keepalived:
 ```
 [kamran@kworkhorse tmp]$ docker exec -it high-availability_haproxy-master_1 /bin/sh
+
 / # keepalived --use-file /etc/keepalived/keepalived.conf  --log-console --dont-fork
+
 Tue Mar 17 20:50:53 2020: Starting Keepalived v2.0.19 (11/24,2019), git commit v20191114-652-g038556d644
 Tue Mar 17 20:50:53 2020: Running on Linux 5.5.7-200.fc31.x86_64 #1 SMP Fri Feb 28 17:18:37 UTC 2020 (built for Linux 4.19.36)
 Tue Mar 17 20:50:53 2020: Command line: 'keepalived' '--use-file' '/etc/keepalived/keepalived.conf' '--log-console'
@@ -94,11 +102,15 @@ Tue Mar 17 20:50:53 2020: (VI_1) Entering BACKUP STATE
 Tue Mar 17 20:50:57 2020: (VI_1) Entering MASTER STATE
 ```
 
+Above seems to work! 
 
 
+Start the keepalived on backup container:
 ```
-/ # [kamran@kworkhorse tmp]$ docker exec -it high-availability_haproxy-backup_1 /bin/sh
+[kamran@kworkhorse tmp]$ docker exec -it high-availability_haproxy-backup_1 /bin/sh
+
 / # keepalived --use-file /etc/keepalived/keepalived.conf  --log-console --dont-fork
+
 Tue Mar 17 20:50:58 2020: Starting Keepalived v2.0.19 (11/24,2019), git commit v20191114-652-g038556d644
 Tue Mar 17 20:50:58 2020: Running on Linux 5.5.7-200.fc31.x86_64 #1 SMP Fri Feb 28 17:18:37 UTC 2020 (built for Linux 4.19.36)
 Tue Mar 17 20:50:58 2020: Command line: 'keepalived' '--use-file' '/etc/keepalived/keepalived.conf' '--log-console'
@@ -115,6 +127,7 @@ Tue Mar 17 20:50:58 2020: VRRP_Script(check_haproxy) succeeded
 Tue Mar 17 20:50:58 2020: (VI_1) Entering BACKUP STATE
 ```
 
+Seems to work properly!
 
 ------------
 
@@ -122,6 +135,7 @@ Tue Mar 17 20:50:58 2020: (VI_1) Entering BACKUP STATE
 Test from the client container:
 ```
 [kamran@kworkhorse high-availability]$ docker exec -it high-availability_client_1 /bin/sh
+
 / # ifconfig
 eth0      Link encap:Ethernet  HWaddr 02:42:C0:A8:C8:06  
           inet addr:192.168.200.6  Bcast:192.168.200.255  Mask:255.255.255.0
@@ -150,6 +164,7 @@ PING 192.168.200.100 (192.168.200.100) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.171/0.171/0.171/0.000 ms
 ```
 
+
 ```
 / # curl -L -k 192.168.200.100
 <title>Web 1</title>
@@ -172,5 +187,22 @@ rtt min/avg/max/mdev = 0.171/0.171/0.171/0.000 ms
 / # 
 ```
 
+
+Run a continuous loop in the client container:
+```
+[kamran@kworkhorse high-availability]$ docker exec -it high-availability_client_1 /bin/sh
+
+/ # while true ; do curl -s -L -k 192.168.200.100 | grep title; sleep 1; done
+<title>Web 2</title>
+<title>Web 1</title>
+<title>Web 2</title>
+<title>Web 1</title>
+<title>Web 2</title>
+<title>Web 1</title>
+<title>Web 2</title>
+<title>Web 1</title>
+<title>Web 2</title>
+<title>Web 1</title>
+```
 
 
