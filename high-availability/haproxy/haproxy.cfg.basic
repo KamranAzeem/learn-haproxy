@@ -1,0 +1,42 @@
+# Example config from: 
+# * http://git.haproxy.org/?p=haproxy-1.8.git;a=blob_plain;f=examples/content-sw-sample.cfg;hb=HEAD
+# * https://www.haproxy.com/blog/the-four-essential-sections-of-an-haproxy-configuration/
+
+
+global
+        maxconn         10000
+        stats 		socket /var/run/haproxy.stat mode 600 level admin
+    	# stats 	socket /run/haproxy/admin.sock user haproxy group haproxy mode 660 level admin
+        # log             /dev/log local0
+        user		nobody
+        group		nobody
+        chroot          /var/empty
+        daemon
+
+
+defaults
+    timeout 	connect 10s
+    timeout 	client 30s
+    timeout 	server 30s
+    # log 	global
+    mode 	http
+    option 	httplog
+    # option	forwardfor
+    # option 	dontlognull
+    # option 	log-health-checks
+    # option 	dontlog-normal
+
+    maxconn 8000
+
+frontend fe_http
+        bind            :80
+        default_backend be_web_farm
+
+backend be_web_farm
+        balance         roundrobin
+        cookie          SERVERUSED insert indirect nocache
+        option 		httpchk  HEAD /
+        default-server	check maxconn 20
+        server          web1 web1:80 cookie web1
+        server          web2 web2:80 cookie web2
+

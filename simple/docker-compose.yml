@@ -1,0 +1,20 @@
+version: '3'
+services:
+  haproxy1:
+    image: haproxy:2.1-alpine
+    # build: haproxy/Dockerfile
+    volumes:
+    - ${PWD}/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    ports:
+    - "80:80"
+  web1:
+    image: nginx:alpine
+    volumes:
+    - ${PWD}/web1-index.html:/usr/share/nginx/html/index.html
+  web2:
+    image: nginx:alpine
+    volumes:
+    - ${PWD}/web2-index.html:/usr/share/nginx/html/index.html
+  client:
+    image: praqma/network-multitool
+

@@ -1,0 +1,44 @@
+version: '3'
+services:
+  haproxy-master:
+    # image: haproxy:2.1-alpine
+    build: haproxy/
+    volumes:
+    - ${PWD}/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    - ${PWD}/certs:/certs
+    - ${PWD}/haproxy/keepalived-master.conf:/etc/keepalived/keepalived.conf
+    cap_add:
+    - ALL
+    networks:
+    - proxy-network
+  haproxy-backup:
+    #image: haproxy:2.1-alpine
+    build: haproxy/
+    volumes:
+    - ${PWD}/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    - ${PWD}/certs:/certs
+    - ${PWD}/haproxy/keepalived-backup.conf:/etc/keepalived/keepalived.conf
+    cap_add:
+    - ALL
+    networks:
+    - proxy-network
+  web1:
+    image: nginx:alpine
+    volumes:
+    - ${PWD}/web1-index.html:/usr/share/nginx/html/index.html
+    networks:
+    - proxy-network
+  web2:
+    image: nginx:alpine
+    volumes:
+    - ${PWD}/web2-index.html:/usr/share/nginx/html/index.html
+    networks:
+    - proxy-network
+  client:
+    image: praqma/network-multitool
+    networks:
+    - proxy-network
+
+networks:
+  proxy-network:
+    external: true
