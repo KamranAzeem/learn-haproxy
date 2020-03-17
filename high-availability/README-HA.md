@@ -68,15 +68,17 @@ Tue Mar 17 20:44:57 2020: Stopped Keepalived v2.0.19 (11/24,2019), git commit v2
 ```
 Above does not work, because the container needs some special capabilities so keepalived can do it's thing.
 
+Create the files in each backend server, so HAProxy can include it in it's routing, as an available backend.
 
 ```
 [kamran@kworkhorse kubernetes]$ docker exec -it high-availability_web1_1 /bin/sh
 / # touch /usr/share/nginx/html/backend.member
 ```
 
+```
 [kamran@kworkhorse kubernetes]$ docker exec -it high-availability_web2_1 /bin/sh
 / # touch /usr/share/nginx/html/backend.member
-``` 
+```
 
 
 Added capabilities to the compose file, and restarted Keepalived:
